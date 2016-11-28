@@ -8,5 +8,6 @@ public class RMIClient {
         Registry registry = LocateRegistry.getRegistry("localhost");
         RMIServerIntf obj = (RMIServerIntf) registry.lookup("RMIServer");
         System.out.println(obj.getMessage()); 
+        // abasdawda
     }
 }
