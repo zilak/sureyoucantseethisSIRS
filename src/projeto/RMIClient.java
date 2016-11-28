@@ -10,5 +10,6 @@ public class RMIClient {
         System.out.println(obj.getMessage()); 
         // abasdawda
         //awdaw
+        //vitor
     }
 }
