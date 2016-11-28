@@ -9,5 +9,6 @@ public class RMIClient {
         RMIServerIntf obj = (RMIServerIntf) registry.lookup("RMIServer");
         System.out.println(obj.getMessage()); 
         // abasdawda
+        //awdaw
     }
 }
