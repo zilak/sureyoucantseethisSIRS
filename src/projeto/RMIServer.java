@@ -3,6 +3,7 @@ package projeto;
 import java.io.BufferedInputStream;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
@@ -14,6 +15,8 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPublicKey;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.crypto.Cipher;
 import javax.xml.bind.DatatypeConverter;
@@ -24,16 +27,26 @@ import java.security.PublicKey;
 
 public class RMIServer 
     implements RMIServerIntf {
-    public static final String MESSAGE = "Hello world";
- 
+	
+	private static Map<Integer,RMIClientIntf> clients = new HashMap<Integer,RMIClientIntf>();
+	private static Map<Integer,RMIClientIntf> penalizado = new HashMap<Integer,RMIClientIntf>();
+	
     public RMIServer() throws RemoteException {
     	
     }
- 
-    public String getMessage() throws RemoteException {
-        return MESSAGE;
+
+    public String registarClient(int port) throws RemoteException{   	
+        try {
+        	Registry registry = LocateRegistry.getRegistry("localhost",port);
+			RMIClientIntf objClient = (RMIClientIntf) registry.lookup("RMIClient");			
+			clients.put(port, objClient);
+			
+		} catch (NotBoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}  	
+        return "registou e numero de cliente: " + clients.size();
     }
-    
 	public void sendCipherText(byte[] ciphertext) throws RemoteException  {
 		//abc
 	}
@@ -56,9 +69,7 @@ public class RMIServer
     		System.out.println("cert: "+ cert.toString()+" public key: " + field+ " issuer: "+cert.getIssuerDN());
     		
     	}
-                
-        
-    	
+                    	
         System.out.println("RMI server started");
         
         //Instantiate RmiServer
@@ -81,6 +92,10 @@ public class RMIServer
         } catch (RemoteException e) {
         	e.printStackTrace();
         }
+               
+        System.out.println("Clique enter se o cliente estiver ativo");       
+        System.in.read();
+        broadcastSMS("msg");
     }
     
     public static byte[] encrypt(String text, PublicKey key){
@@ -112,6 +127,13 @@ public class RMIServer
 
         return new String(dectyptedText);
     }
-
+    
+    public static void broadcastSMS(String msg) throws RemoteException{
+    	for (Map.Entry<Integer, RMIClientIntf> entry : clients.entrySet()) {
+			RMIClientIntf theclient = entry.getValue();
+			theclient.sendMessage(msg);
+			System.out.println("enviou a msm para o: "+ entry.getKey());
+		}
+    }
 }
 

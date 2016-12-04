@@ -1,31 +1,55 @@
 package projeto;
 
 import java.io.FileInputStream;
+import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
+import java.rmi.server.UnicastRemoteObject;
 import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.Certificate;
+import java.util.Scanner;
 
 import javax.crypto.Cipher;
 
-public class RMIClient { 
+public class RMIClient implements RMIClientIntf{ 
     public static void main(String args[]) throws Exception {
+    	
+    	System.out.println("Indique o seu numero de port:");
+    	Scanner s = new Scanner(System.in);
+    	int port = s.nextInt();
+    	
+    	//Instantiate RmiServer
+        RMIClient obj = new RMIClient();
+        try { //special exception handler for registry creation
+        	
+            RMIClientIntf stub = (RMIClientIntf) UnicastRemoteObject.exportObject(obj,0);
+            Registry reg;
+            try {
+            	reg = LocateRegistry.createRegistry(port);
+                System.out.println("java RMI registry created.");
+
+            } catch(Exception e) {
+            	System.out.println("Using existing registry");
+            	reg = LocateRegistry.getRegistry();
+            }
+        	reg.rebind("RMIClient", stub);
+
+        } catch (RemoteException e) {
+        	e.printStackTrace();
+        }   
+        System.out.println("Clique enter se o server estiver ativo");
+        System.in.read();
+        
+    	// connect to server
     	Registry registry = LocateRegistry.getRegistry("localhost");
-        RMIServerIntf obj = (RMIServerIntf) registry.lookup("RMIServer");
-        System.out.println(obj.getMessage()); 
+        RMIServerIntf objServer = (RMIServerIntf) registry.lookup("RMIServer");
+        System.out.println("saida do registar: " + objServer.registarClient(port));
         // abasdawda
         //awdaw
         //vitor
-        
-        FileInputStream is = new FileInputStream("C:/Users/joao-/Desktop/Mestrado/1º Ano/Segurança Informática em Redes e Sistemas/sureyoucantseethisSIRS/keystore");
-        KeyStore ks = KeyStore.getInstance("JKS");
-        ks.load(is, null);
-        String alias = "INEM";
-        
-        Certificate cert = ks.getCertificate(alias);
-        cert.getPublicKey();
+              
         
     }
     
@@ -57,5 +81,16 @@ public class RMIClient {
         }
         return new String(dectyptedText);
     }
+
+	@Override
+	public void sendMessage(String msg) throws RemoteException {
+		System.out.println("entrou na msg e a msg e: "+msg);
+	}
+
+	@Override
+	public void sendCipherText(byte[] ciphertex) throws RemoteException {
+		// TODO Auto-generated method stub
+		
+	}
 }
 
