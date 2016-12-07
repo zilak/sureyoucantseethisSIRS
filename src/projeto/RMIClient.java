@@ -9,9 +9,12 @@ import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.Certificate;
+import java.security.cert.X509Certificate;
+import java.security.interfaces.RSAPublicKey;
 import java.util.Scanner;
 
 import javax.crypto.Cipher;
+import javax.xml.bind.DatatypeConverter;
 
 public class RMIClient implements RMIClientIntf{ 
     public static void main(String args[]) throws Exception {
@@ -46,12 +49,25 @@ public class RMIClient implements RMIClientIntf{
     	Registry registry = LocateRegistry.getRegistry("localhost");
         RMIServerIntf objServer = (RMIServerIntf) registry.lookup("RMIServer");
         System.out.println("saida do registar: " + objServer.registarClient(port));
-        // abasdawda
-        //awdaw
-        //vitor
-              
         
-    }
+        // verify the cert
+        
+        X509Certificate cert = objServer.getCertificate();
+        
+        if(cert.getSubjectDN().toString().contains("CN=INEM")&& cert.getIssuerDN().toString().contains("CN=CA")){
+        	System.out.println("subject: "+cert.getSubjectDN());
+    		System.out.println(cert.getIssuerDN().toString());
+    		RSAPublicKey pkey =(RSAPublicKey)cert.getPublicKey(); 
+    		String field = DatatypeConverter.printHexBinary(pkey.getEncoded());
+    		pkey.getEncoded();
+    		//System.out.println("cert: "+ cert.toString()+" public key: " + field+ " issuer: "+cert.getIssuerDN() );
+        }       
+        
+        // send the request to registe this client
+        byte[] cipherText = encrypt("registe",cert.getPublicKey());
+        objServer.sendCipherText(cipherText, port);
+        
+    }   
     
     public static byte[] encrypt(String text, PublicKey key){
     	byte[] cipherText = null;
@@ -83,7 +99,7 @@ public class RMIClient implements RMIClientIntf{
     }
 
 	@Override
-	public void sendMessage(String msg) throws RemoteException {
+	public void sendChallenge(String msg) throws RemoteException {
 		System.out.println("entrou na msg e a msg e: "+msg);
 	}
 
