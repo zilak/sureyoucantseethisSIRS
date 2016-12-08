@@ -89,10 +89,27 @@ public class RMIClient implements RMIClientIntf{
       
         // send the request to registe this client
         serverKey = cert.getPublicKey();
-        byte[] cipherText = encrypt("registe",serverKey);
+        byte[] cipherText = encrypt("registe "+port,serverKey);
         objServer.sendCipherText(cipherText, port);
         
     }   
+    
+    public static void menu() throws InvalidKeyException, NoSuchAlgorithmException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, RemoteException{
+    	while(true){
+	    	System.out.println("1- Type "+1+" to send a emergency request:");
+	    	System.out.println("2- Type "+2+" to send blabla....");
+	    	switch(s.nextInt()){
+	    	case 1:
+	    		System.out.println("Give your location: ");
+	    		String line = s.next();
+	    		System.out.println("localizacao: "+line);
+	    		byte[] cyphertext = aesencrypt("help "+port+" "+line,aesKey);
+	    		objServer.sendAESCipherText(cyphertext,port);
+	    		break;
+	    	}
+    	}
+    	
+    }
     
     public static void createKey() throws NoSuchAlgorithmException{
     	KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
@@ -131,7 +148,7 @@ public class RMIClient implements RMIClientIntf{
         }
         return new String(dectyptedText);
     }
-    public byte[] aesencrypt(String plainText, SecretKey key) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException{
+    public static byte[] aesencrypt(String plainText, SecretKey key) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException{
     	Cipher cipher = Cipher.getInstance("AES");
     	cipher.init(Cipher.ENCRYPT_MODE, key);
     	byte[] encrypted = cipher.doFinal(plainText.getBytes());
@@ -148,7 +165,7 @@ public class RMIClient implements RMIClientIntf{
 	public void sendChallenge() throws RemoteException, NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException {
 		System.out.println("Type here the answer to the challenge:");
         int msg = s.nextInt();
-		byte[] cipherText = encrypt("response "+msg+" "+pubKey,serverKey);
+		byte[] cipherText = encrypt("response "+port+" "+msg+" "+pubKey,serverKey);
         try {
 			objServer.sendCipherText(cipherText, port);
 		} catch (Base64DecodingException e) {
@@ -167,10 +184,10 @@ public class RMIClient implements RMIClientIntf{
 			// decode the base64 encoded string
 			byte[] decodedKey = Base64.getDecoder().decode(msg[1]);
 			// rebuild key using SecretKeySpec
-			aesKey = new SecretKeySpec(decodedKey, 0, decodedKey.length, "AES"); 
-			
+			aesKey = new SecretKeySpec(decodedKey, 0, decodedKey.length, "AES"); 			
 			break;
 		}
+		menu();
 		
 	}
 

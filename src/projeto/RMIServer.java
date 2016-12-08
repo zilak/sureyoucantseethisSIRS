@@ -193,70 +193,70 @@ public class RMIServer
 		}else{
 			String[] receive =decrypt(ciphertext,inemPrivate).split("\\s+");
 			System.out.println("receive: "+receive[0]);
-			switch(receive[0]){
-			case "registe":
-				Random random = new Random();
-				int response = random.nextInt(999999 - 100000 +1)+100000;
-				RMIClientIntf desafiar  = clients.get(port);
-				System.out.println("The Client must response the challenge witht the the next number: "+response);				
-				challengeSend.put(port, response);
-				desafiar.sendChallenge();
-				//enviar o challange
-				break;
-			case "response":
-				// check it has already receive a response of that port
-				if(!challengeReceive.containsKey(port)){
-					System.out.println("reposta: " +receive[1] + " modulos: "+receive[9]+ " expoent: "+receive[12]);
-					int challegeResponse= Integer.parseInt(receive[1]);
-					// compares the challenge send with the response, if it equals than its him. This challange is done by an sms
-					
-					// 9 string is the modulos
-					BigInteger m = new BigInteger(receive[9]);
-					
-					//12 is the expoent
-					BigInteger e = new BigInteger(receive[12]);
-					RSAPublicKeySpec keySpec = new RSAPublicKeySpec (m,e);
-					//Say what type of instance the key is
-					KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-								
-					PublicKey pubKey = keyFactory.generatePublic(keySpec);
-					clientsPub.put(port, pubKey);
-					
-					SecretKey secretKey = createAESKey();
-					
-					String encodedKey = Base64.getEncoder().encodeToString(secretKey.getEncoded());
-					System.out.println("secretKey: "+secretKey + " encoded: "+ encodedKey + " secretkey.encoded: "+secretKey.getEncoded());
-					
-					if(!clientsAES.containsValue(secretKey)){
-						byte[] cipher = encrypt("sessao "+encodedKey,pubKey);
-						clientsAES.put(port, secretKey);
+			int portEnv = Integer.parseInt(receive[1]);
+			if(portEnv == port){
+				switch(receive[0]){
+				case "registe":
+					Random random = new Random();
+					int response = random.nextInt(999999 - 100000 +1)+100000;
+					RMIClientIntf desafiar  = clients.get(port);
+					System.out.println("The Client must response the challenge witht the the next number: "+response);					
+					challengeSend.put(port, response);
+					desafiar.sendChallenge();
+					break;
+				case "response":
+					// check it has already receive a response of that port
+					if(!challengeReceive.containsKey(port)){
+						System.out.println("reposta: " +receive[2] + " modulos: "+receive[10]+ " expoent: "+receive[13]);
+						String modulos = receive[10];
+						String expoent = receive[13];
+						// compares the challenge send with the response, if it equals than its him. This challange is done by an sms
 						
-						System.out.println("Colocou no clientsAES a seguinte chave:"+secretKey);
+						// 9 string is the modulos
+						BigInteger m = new BigInteger(modulos);
 						
-						System.out.println("Colocou no clientsAES a seguinte chave:"+secretKey + " e ao seu tipo: "+secretKey.getFormat());
+						//12 is the expoent
+						BigInteger e = new BigInteger(expoent);
+						RSAPublicKeySpec keySpec = new RSAPublicKeySpec (m,e);
+						//Say what type of instance the key is
+						KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+									
+						PublicKey pubKey = keyFactory.generatePublic(keySpec);
+						clientsPub.put(port, pubKey);
 						
-						RMIClientIntf client = clients.get(port);
-						client.sendCipherText(cipher);
-					}else{
-						/*// try to create new aes that are not in the hashmap
-						while(!clientsAES.containsValue(secretKey)){
-							secretKey =createAESKey();
+						SecretKey secretKey = createAESKey();
+						
+						String encodedKey = Base64.getEncoder().encodeToString(secretKey.getEncoded());
+						System.out.println("secretKey: "+secretKey + " encoded: "+ encodedKey + " secretkey.encoded: "+secretKey.getEncoded());
+						
+						if(!clientsAES.containsValue(secretKey)){
+							byte[] cipher = encrypt("sessao "+encodedKey,pubKey);
 							clientsAES.put(port, secretKey);
+							
+							System.out.println("Colocou no clientsAES a seguinte chave:"+secretKey);
+							
 							System.out.println("Colocou no clientsAES a seguinte chave:"+secretKey + " e ao seu tipo: "+secretKey.getFormat());
 							
-							encodedKey = Base64.getEncoder().encodeToString(secretKey.getEncoded());
-							byte[] cipher = encrypt("sessao "+encodedKey,pubKey);
 							RMIClientIntf client = clients.get(port);
 							client.sendCipherText(cipher);
-						}*/
+						}else{
+							/*// try to create new aes that are not in the hashmap
+							while(!clientsAES.containsValue(secretKey)){
+								secretKey =createAESKey();
+								clientsAES.put(port, secretKey);
+								System.out.println("Colocou no clientsAES a seguinte chave:"+secretKey + " e ao seu tipo: "+secretKey.getFormat());
+								
+								encodedKey = Base64.getEncoder().encodeToString(secretKey.getEncoded());
+								byte[] cipher = encrypt("sessao "+encodedKey,pubKey);
+								RMIClientIntf client = clients.get(port);
+								client.sendCipherText(cipher);
+							}*/
+							}
 					}
-					
-				}
-				break;
-				
-			}
-			
-		}
+					break;
+				}				
+			}			
+		}		
 	}
     
 	@Override
@@ -267,12 +267,16 @@ public class RMIServer
 	@Override
 	public void sendAESCipherText(byte[] ciphertext, int port) throws RemoteException, InvalidKeyException, NoSuchAlgorithmException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException {
 		System.out.println("Entrou no AESCipher Server e size do clientsAES: " + clientsAES.size());
-		if(clientsAES.containsKey(port)){
-			
-			SecretKey secretKey = clientsAES.get(port);
-			System.out.println("Entrou no AESCipher Server e a chave AES e: "+secretKey);
-			String msg = aesdecrypt(ciphertext,secretKey);
-			System.out.println("msg = "+msg);
+		SecretKey secretKey = clientsAES.get(port);
+		System.out.println("Entrou no AESCipher Server e a chave AES e: "+secretKey);
+		String[] msg = aesdecrypt(ciphertext,secretKey).split("\\s+");
+		int portEnv = Integer.parseInt(msg[1]);
+		if(portEnv == port){
+			switch(msg[0]){
+			case "help":
+				System.out.println("Pedido de ajuda em: " + msg[2]);
+				break;
+			}
 		}
 	}
 }
