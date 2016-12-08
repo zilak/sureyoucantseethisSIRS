@@ -4,12 +4,14 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.math.BigInteger;
 import java.nio.file.Files;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
+import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
@@ -20,17 +22,25 @@ import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.RSAPublicKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.Base64;
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+
 import sun.misc.BASE64Decoder;
 import sun.misc.BASE64Encoder;
 import java.util.Base64;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
+import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.xml.bind.DatatypeConverter;
 
@@ -42,11 +52,13 @@ import java.security.PublicKey;
 public class RMIServer 
     implements RMIServerIntf {
 	
-	private static Map<Integer,RMIClientIntf> clients = new HashMap<Integer,RMIClientIntf>();
-	private static Map<Integer,RMIClientIntf> penalizado = new HashMap<Integer,RMIClientIntf>();
-	private static Map<Integer,Integer> challengeSend = new HashMap<Integer,Integer>();
-	private static Map<Integer,Integer> challengeReceive = new HashMap<Integer,Integer>();
-	private static Map<Integer,PublicKey> clientsPub = new HashMap<Integer,PublicKey>();
+	private static Map<Integer,RMIClientIntf> clients = new HashMap<Integer,RMIClientIntf>(); // conetao com os clientes
+	private static Map<Integer,RMIClientIntf> penalizado = new HashMap<Integer,RMIClientIntf>(); // penalizados
+	private static Map<Integer,Integer> challengeSend = new HashMap<Integer,Integer>();  // os challegens send
+	private static Map<Integer,Integer> challengeReceive = new HashMap<Integer,Integer>(); // os challenges received
+	private static Map<Integer,PublicKey> clientsPub = new HashMap<Integer,PublicKey>(); // Clients connected public
+	private static Map<Integer,SecretKey> clientsAES = new HashMap<Integer,SecretKey>(); // Sessions key with clients
+	private static Map<SecretKey,Integer> tokenAES = new HashMap <SecretKey,Integer>(); // Check if the message sent with that key is fresh(cant send duplicate token)
 	
     public RMIServer() throws RemoteException {
     	
@@ -139,13 +151,29 @@ public class RMIServer
     
     // Create a symetrical key (AES)
     
-    public static SecretKey createAESKey() throws NoSuchAlgorithmException{
+    public  SecretKey createAESKey() throws NoSuchAlgorithmException{
     	KeyGenerator kgen = KeyGenerator.getInstance("AES");
     	kgen.init(128);
+    	SecretKey secret = kgen.generateKey();
     	
-    	return null;
+    	return secret;
     }
+    public byte[] aesencrypt(String plainText, SecretKey key) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException{
+    	Cipher cipher = Cipher.getInstance("AES");
+    	cipher.init(Cipher.ENCRYPT_MODE, key);
+    	byte[] encrypted = cipher.doFinal(plainText.getBytes());
+    	return encrypted;
+    }
+    public String aesdecrypt(byte[] cipherText ,SecretKey key) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException{
 
+    	System.out.println("chave aes decript: "+key + "formato: "+key.getFormat());
+    	Cipher cipher = Cipher.getInstance("AES");
+    	cipher.init(Cipher.DECRYPT_MODE, key);
+    	byte[] text = cipher.doFinal(cipherText);
+    	String plaintext = new String(text);
+    	return plaintext;
+    }
+    
     public String registarClient(int port) throws RemoteException{   	
         try {
         	Registry registry = LocateRegistry.getRegistry("localhost",port);
@@ -159,43 +187,73 @@ public class RMIServer
         return "registou e numero de cliente: " + clients.size();
     }
     
-	public void sendCipherText(byte[] ciphertext,int port) throws RemoteException  {
+	public void sendCipherText(byte[] ciphertext,int port) throws RemoteException, NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException  {
 		if(penalizado.containsKey(port)){
 			// dizer que esta penalizado
 		}else{
 			String[] receive =decrypt(ciphertext,inemPrivate).split("\\s+");
+			System.out.println("receive: "+receive[0]);
 			switch(receive[0]){
 			case "registe":
 				Random random = new Random();
 				int response = random.nextInt(999999 - 100000 +1)+100000;
 				RMIClientIntf desafiar  = clients.get(port);
+				System.out.println("The Client must response the challenge witht the the next number: "+response);				
 				challengeSend.put(port, response);
+				desafiar.sendChallenge();
 				//enviar o challange
 				break;
 			case "response":
+				// check it has already receive a response of that port
 				if(!challengeReceive.containsKey(port)){
+					System.out.println("reposta: " +receive[1] + " modulos: "+receive[9]+ " expoent: "+receive[12]);
 					int challegeResponse= Integer.parseInt(receive[1]);
-					if(challegeResponse == challengeSend.get(port)){
-						byte[] data = Base64.getDecoder().decode(receive[2]);
-					    X509EncodedKeySpec spec = new X509EncodedKeySpec(data);
-					    KeyFactory fact;
-						try {
-							fact = KeyFactory.getInstance("DSA");
-							try {
-								PublicKey clientPub = fact.generatePublic(spec);
-								clientsPub.put(port, clientPub);
-							} catch (InvalidKeySpecException e) {
-								// TODO Auto-generated catch block
-								e.printStackTrace();
-							}
-						} catch (NoSuchAlgorithmException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-					    
+					// compares the challenge send with the response, if it equals than its him. This challange is done by an sms
+					
+					// 9 string is the modulos
+					BigInteger m = new BigInteger(receive[9]);
+					
+					//12 is the expoent
+					BigInteger e = new BigInteger(receive[12]);
+					RSAPublicKeySpec keySpec = new RSAPublicKeySpec (m,e);
+					//Say what type of instance the key is
+					KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+								
+					PublicKey pubKey = keyFactory.generatePublic(keySpec);
+					clientsPub.put(port, pubKey);
+					
+					SecretKey secretKey = createAESKey();
+					
+					String encodedKey = Base64.getEncoder().encodeToString(secretKey.getEncoded());
+					System.out.println("secretKey: "+secretKey + " encoded: "+ encodedKey + " secretkey.encoded: "+secretKey.getEncoded());
+					
+					if(!clientsAES.containsValue(secretKey)){
+						byte[] cipher = encrypt("sessao "+encodedKey,pubKey);
+						clientsAES.put(port, secretKey);
+						
+						System.out.println("Colocou no clientsAES a seguinte chave:"+secretKey);
+						
+						System.out.println("Colocou no clientsAES a seguinte chave:"+secretKey + " e ao seu tipo: "+secretKey.getFormat());
+						
+						RMIClientIntf client = clients.get(port);
+						client.sendCipherText(cipher);
+					}else{
+						/*// try to create new aes that are not in the hashmap
+						while(!clientsAES.containsValue(secretKey)){
+							secretKey =createAESKey();
+							clientsAES.put(port, secretKey);
+							System.out.println("Colocou no clientsAES a seguinte chave:"+secretKey + " e ao seu tipo: "+secretKey.getFormat());
+							
+							encodedKey = Base64.getEncoder().encodeToString(secretKey.getEncoded());
+							byte[] cipher = encrypt("sessao "+encodedKey,pubKey);
+							RMIClientIntf client = clients.get(port);
+							client.sendCipherText(cipher);
+						}*/
 					}
+					
 				}
 				break;
+				
 			}
 			
 		}
@@ -204,6 +262,18 @@ public class RMIServer
 	@Override
 	public X509Certificate getCertificate() {
 		return myCert;
+	}
+
+	@Override
+	public void sendAESCipherText(byte[] ciphertext, int port) throws RemoteException, InvalidKeyException, NoSuchAlgorithmException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException {
+		System.out.println("Entrou no AESCipher Server e size do clientsAES: " + clientsAES.size());
+		if(clientsAES.containsKey(port)){
+			
+			SecretKey secretKey = clientsAES.get(port);
+			System.out.println("Entrou no AESCipher Server e a chave AES e: "+secretKey);
+			String msg = aesdecrypt(ciphertext,secretKey);
+			System.out.println("msg = "+msg);
+		}
 	}
 }
 
