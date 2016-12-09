@@ -80,10 +80,6 @@ public class RMIServer
 		
 		//Second argument is the file that has the private key
 		inemPrivate = getPrivate(args[1]);
-		
-		System.out.println("Privateee: "+inemPrivate.toString());
-		System.out.println("cert: " + myCert.getPublicKey());
-		    	
         
 		
         System.out.println("RMI server started");
@@ -169,7 +165,6 @@ public class RMIServer
     }
     public String aesdecrypt(byte[] cipherText ,SecretKey key) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException{
 
-    	System.out.println("chave aes decript: "+key + "formato: "+key.getFormat());
     	Cipher cipher = Cipher.getInstance("AES");
     	cipher.init(Cipher.DECRYPT_MODE, key);
     	byte[] text = cipher.doFinal(cipherText);
@@ -212,8 +207,9 @@ public class RMIServer
 					challengeSend.put(port, response);
 					break;
 				case "response":
+					int abc = Integer.parseInt(receive[2]);
 					// check it has already receive a response of that port
-					if(!challengeReceive.containsKey(port)){
+					if(!challengeReceive.containsKey(port) && challengeSend.get(port) == abc){
 						System.out.println("reposta: " +receive[2] + " modulos: "+receive[10]+ " expoent: "+receive[13]);
 						String modulos = receive[10];
 						String expoent = receive[13];

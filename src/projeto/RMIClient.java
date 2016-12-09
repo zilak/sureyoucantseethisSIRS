@@ -118,7 +118,7 @@ public class RMIClient implements RMIClientIntf{
         	objServer.sendCipherText(cipherText, port); 
         	sendChallenge();
         }else{
-        	System.out.println("Certificado experido");
+        	System.out.println("Certificate expired");
         	s.nextLine();
         	
         }
@@ -127,7 +127,7 @@ public class RMIClient implements RMIClientIntf{
     public static void menu() throws InvalidKeyException, NoSuchAlgorithmException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, RemoteException{
     	while(true){
 	    	System.out.println("1- Type "+1+" to send a emergency request:");
-	    	System.out.println("2- Type "+2+" to send blabla....");
+	    	//System.out.println("2- Type "+2+" to send blabla....");
 	    	switch(s.nextInt()){
 	    	case 1:
 	    		System.out.println("Give your location: ");
