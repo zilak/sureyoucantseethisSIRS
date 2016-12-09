@@ -13,6 +13,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.Certificate;
+import java.security.cert.CertificateExpiredException;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.InvalidKeySpecException;
@@ -80,6 +81,16 @@ public class RMIClient implements RMIClientIntf{
         // verify the cert of SERVER checks if it is INEM
         
         X509Certificate cert = objServer.getCertificate();
+        String[] subject = cert.getSubjectDN().toString().split(" ");
+        System.out.println(" basic contrains: "+cert.getBasicConstraints());
+        boolean notexpired=false;
+        try{
+        	cert.checkValidity();
+        	notexpired =true;
+        	System.out.println("Certificate is not expired");
+        }catch(CertificateExpiredException cee){
+        	System.out.println(" Certificate is expired");
+        }
         
         if(cert.getSubjectDN().toString().contains("CN=INEM")&& cert.getIssuerDN().toString().contains("CN=CA")){
         	System.out.println("subject: "+cert.getSubjectDN());
@@ -106,17 +117,21 @@ public class RMIClient implements RMIClientIntf{
 	    		System.out.println("Give your location: ");
 	    		String line = s.next();
 	    		System.out.println("localizacao: "+line);
-	    		Random r = new Random();
-				int token = r.nextInt(999999 - 100000 +1)+100000;
-				while(tokens.contains(token)){
-					token = r.nextInt(999999 - 100000 +1)+100000;
-				}
-	    		byte[] cyphertext = aesencrypt("help "+port+" " + token+" "+line,aesKey);
+	    		
+	    		byte[] cyphertext = aesencrypt("help "+port+" " + createToken()+" "+line,aesKey);
 	    		objServer.sendAESCipherText(cyphertext,port);
 	    		break;
 	    	}
     	}
     	
+    }
+    public static int createToken(){
+    	Random r = new Random();
+		int token = r.nextInt(999999 - 100000 +1)+100000;
+		while(tokens.contains(token)){
+			token = r.nextInt(999999 - 100000 +1)+100000;
+		}
+		return token;
     }
     
     public static void createKey() throws NoSuchAlgorithmException{

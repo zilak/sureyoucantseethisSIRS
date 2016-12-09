@@ -60,7 +60,7 @@ public class RMIServer
 	private static Map<Integer,Integer> challengeReceive = new HashMap<Integer,Integer>(); // os challenges received
 	private static Map<Integer,PublicKey> clientsPub = new HashMap<Integer,PublicKey>(); // Clients connected public
 	private static Map<Integer,SecretKey> clientsAES = new HashMap<Integer,SecretKey>(); // Sessions key with clients
-	private static ArrayList<Integer> tokenAES = new ArrayList <Integer>(); // Check if the message sent with that key is fresh(cant send duplicate token)
+	private static ArrayList<Integer> tokens = new ArrayList <Integer>(); // Check if the message sent with that key is fresh(cant send duplicate token)
 	private static Map<Integer,Integer> noCount = new HashMap<Integer,Integer>();
 	
     public RMIServer() throws RemoteException {
@@ -181,8 +181,7 @@ public class RMIServer
         try {
         	Registry registry = LocateRegistry.getRegistry("localhost",port);
 			RMIClientIntf objClient = (RMIClientIntf) registry.lookup("RMIClient");			
-			clients.put(port, objClient);
-			
+			clients.put(port, objClient);			
 		} catch (NotBoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -273,26 +272,44 @@ public class RMIServer
 		SecretKey secretKey = clientsAES.get(port);
 		System.out.println("Entrou no AESCipher Server e a chave AES e: "+secretKey);
 		String[] msg = aesdecrypt(ciphertext,secretKey).split("\\s+");
+		// port is the second string in the array
 		int portEnv = Integer.parseInt(msg[1]);
+		// token is the third string in the array
 		int token = Integer.parseInt(msg[2]);
 		Scanner s = new Scanner(System.in);
-		if(portEnv == port && tokenAES.contains(token)){
+		if(portEnv == port && !tokens.contains(token)){
+			tokens.add(token);
 			switch(msg[0]){
 			case "help":
 				System.out.println("Help request in: " + msg[3]);
-				System.out.println("Type [Y] for help type [N] for discard");
-				String resp = s.next().toUpperCase();
+				System.out.println("Type [1] for help type [2] for discard1");
+				int resp= s.nextInt();
+
 				
-				while(!resp.equals("Y") || !resp.equals("N")){
-					System.out.println("Type [Y] for help type [N] for discard");
-					resp = s.next().toUpperCase();
+				while(resp!=0 && resp!=1){
+					System.out.println("Type [Y] for help type [N] for discard2");
+					resp = s.nextInt();
 				}
-				if(resp.compareTo("Y")==0){
+
+				if(resp==1){
+					byte[] ciphertext1 = aesencrypt("help "+createToken()+" is coming",clientsAES.get(port));
+					System.out.println("You sent help");
+					RMIClientIntf client = clients.get(port);					
+					client.sendSymCipherText(ciphertext1);
+				}else{
 					
 				}
 				break;
 			}
 		}
 	}
+	public static int createToken(){
+    	Random r = new Random();
+		int token = r.nextInt(999999 - 100000 +1)+100000;
+		while(tokens.contains(token)){
+			token = r.nextInt(999999 - 100000 +1)+100000;
+		}
+		return token;
+    }
 }
 
