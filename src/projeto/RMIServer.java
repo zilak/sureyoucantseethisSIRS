@@ -177,16 +177,22 @@ public class RMIServer
     	return plaintext;
     }
     
-    public String registarClient(int port) throws RemoteException{   	
+    public void registarClient(int port,int numero) throws RemoteException{   	
         try {
         	Registry registry = LocateRegistry.getRegistry("localhost",port);
-			RMIClientIntf objClient = (RMIClientIntf) registry.lookup("RMIClient");			
-			clients.put(port, objClient);			
+			RMIClientIntf objClient = (RMIClientIntf) registry.lookup("RMIClient");	
+			if(clients.containsKey(port)){
+				System.out.println("A second user with the port "+port+" tryed to connect");
+				
+			}else{
+				System.out.println("The port "+port+" has registed");
+				clients.put(port, objClient);
+			}			
 		} catch (NotBoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}  	
-        return "registou e numero de cliente: " + clients.size();
+        
     }
     
 	public void sendCipherText(byte[] ciphertext,int port) throws RemoteException, NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException  {
@@ -204,7 +210,6 @@ public class RMIServer
 					RMIClientIntf desafiar  = clients.get(port);
 					System.out.println("The Client must response the challenge witht the the next number: "+response);					
 					challengeSend.put(port, response);
-					desafiar.sendChallenge();
 					break;
 				case "response":
 					// check it has already receive a response of that port
@@ -242,17 +247,16 @@ public class RMIServer
 							RMIClientIntf client = clients.get(port);
 							client.sendCipherText(cipher);
 						}else{
-							/*// try to create new aes that are not in the hashmap
-							while(!clientsAES.containsValue(secretKey)){
+							// try to create new aes that are not in the hashmap
+							while(clientsAES.containsValue(secretKey)){
 								secretKey =createAESKey();
-								clientsAES.put(port, secretKey);
-								System.out.println("Colocou no clientsAES a seguinte chave:"+secretKey + " e ao seu tipo: "+secretKey.getFormat());
-								
-								encodedKey = Base64.getEncoder().encodeToString(secretKey.getEncoded());
-								byte[] cipher = encrypt("sessao "+encodedKey,pubKey);
-								RMIClientIntf client = clients.get(port);
-								client.sendCipherText(cipher);
-							}*/
+							}
+							clientsAES.put(port, secretKey);
+							//System.out.println("Colocou no clientsAES a seguinte chave:"+secretKey + " e ao seu tipo: "+secretKey.getFormat());								
+							encodedKey = Base64.getEncoder().encodeToString(secretKey.getEncoded());
+							byte[] cipher = encrypt("sessao "+encodedKey,pubKey);
+							RMIClientIntf client = clients.get(port);
+							client.sendCipherText(cipher);
 							}
 					}
 					break;
@@ -261,10 +265,7 @@ public class RMIServer
 		}		
 	}
     
-	@Override
-	public X509Certificate getCertificate() {
-		return myCert;
-	}
+
 
 	@Override
 	public void sendAESCipherText(byte[] ciphertext, int port) throws RemoteException, InvalidKeyException, NoSuchAlgorithmException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException {
@@ -283,21 +284,26 @@ public class RMIServer
 			case "help":
 				System.out.println("Help request in: " + msg[3]);
 				System.out.println("Type [1] for help type [2] for discard1");
-				int resp= s.nextInt();
-
-				
-				while(resp!=0 && resp!=1){
+				int resp= s.nextInt();									
+				while(resp!=1 && resp!=2){
 					System.out.println("Type [Y] for help type [N] for discard2");
 					resp = s.nextInt();
 				}
 
 				if(resp==1){
-					byte[] ciphertext1 = aesencrypt("help "+createToken()+" is coming",clientsAES.get(port));
+					byte[] ciphertext1 = aesencrypt("help is coming",clientsAES.get(port));
 					System.out.println("You sent help");
 					RMIClientIntf client = clients.get(port);					
 					client.sendSymCipherText(ciphertext1);
 				}else{
+					System.out.println("Do you want to penalize the client? ([1] for Yes [2] for No)");
+					int responce = s.nextInt();
+					while(responce != 1 && responce != 2){
+						System.out.println("Do you want to penalize the client? ([Y] for Yes [N] for No)");
+						responce = s.nextInt();
+					}
 					
+					System.out.println("saiu while "+ responce);
 				}
 				break;
 			}

@@ -1,5 +1,6 @@
 package projeto;
 
+import java.io.BufferedInputStream;
 import java.io.FileInputStream;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
@@ -14,6 +15,7 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateExpiredException;
+import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.InvalidKeySpecException;
@@ -41,8 +43,23 @@ public class RMIClient implements RMIClientIntf{
 	private static int port;
 	private static Scanner s = new Scanner(System.in);
 	private static ArrayList<Integer> tokens = new ArrayList<Integer>();
+	private static X509Certificate caCert;
+	private static X509Certificate inemCert;
 	
     public static void main(String args[]) throws Exception {
+    	
+    	// Ca certificate
+    	FileInputStream input = new FileInputStream(args[0]);
+    	BufferedInputStream bufinput = new BufferedInputStream(input);
+    	CertificateFactory cf =  CertificateFactory.getInstance("X.509");    	
+		caCert = (X509Certificate)cf.generateCertificate(bufinput);
+		
+		// INEM certificate
+		FileInputStream input1 = new FileInputStream(args[1]);
+    	BufferedInputStream bufinput1 = new BufferedInputStream(input1);
+    	CertificateFactory cf1 =  CertificateFactory.getInstance("X.509");    	
+		inemCert = (X509Certificate)cf1.generateCertificate(bufinput1);
+    	
     	
     	System.out.println("Indique o seu numero de port:");
     	
@@ -76,36 +93,35 @@ public class RMIClient implements RMIClientIntf{
     	// connect to server
     	Registry registry = LocateRegistry.getRegistry("localhost");
     	objServer = (RMIServerIntf) registry.lookup("RMIServer");
-        System.out.println("saida do registar: " + objServer.registarClient(port));
+    	Random r = new Random();
+    	int x = r.nextInt(999999999 - 100000000+1)+100000000;
+        objServer.registarClient(port,x);
         
         // verify the cert of SERVER checks if it is INEM
         
-        X509Certificate cert = objServer.getCertificate();
-        String[] subject = cert.getSubjectDN().toString().split(" ");
-        System.out.println(" basic contrains: "+cert.getBasicConstraints());
         boolean notexpired=false;
         try{
-        	cert.checkValidity();
+        	inemCert.checkValidity();
+        	inemCert.verify(caCert.getPublicKey());
+        	caCert.checkValidity();
+        	caCert.verify(caCert.getPublicKey());
+        	
+        	System.out.println("The certificate chain is valid");
         	notexpired =true;
-        	System.out.println("Certificate is not expired");
         }catch(CertificateExpiredException cee){
         	System.out.println(" Certificate is expired");
         }
         
-        if(cert.getSubjectDN().toString().contains("CN=INEM")&& cert.getIssuerDN().toString().contains("CN=CA")){
-        	System.out.println("subject: "+cert.getSubjectDN());
-    		System.out.println(cert.getIssuerDN().toString());
-    		RSAPublicKey pkey =(RSAPublicKey)cert.getPublicKey(); 
-    		String field = DatatypeConverter.printHexBinary(pkey.getEncoded());
-    		pkey.getEncoded();
-    		
-        } 
-      
-        // send the request to registe this client
-        serverKey = cert.getPublicKey();
-        byte[] cipherText = encrypt("registe "+port,serverKey);
-        objServer.sendCipherText(cipherText, port);
-        
+        if(notexpired){
+        	serverKey = inemCert.getPublicKey();
+        	byte[] cipherText = encrypt("registe "+port,serverKey);
+        	objServer.sendCipherText(cipherText, port); 
+        	sendChallenge();
+        }else{
+        	System.out.println("Certificado experido");
+        	s.nextLine();
+        	
+        }
     }   
     
     public static void menu() throws InvalidKeyException, NoSuchAlgorithmException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, RemoteException{
@@ -183,10 +199,8 @@ public class RMIClient implements RMIClientIntf{
     	String plaintext = new String(cipher.doFinal(cipherText));
     	return plaintext;
     }
-
-	@Override
-	public void sendChallenge() throws RemoteException, NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException {
-		System.out.println("Type here the answer to the challenge:");
+	public static void sendChallenge() throws RemoteException, NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException {
+		System.out.println("Type here the number you receive in your phone:");
         int msg = s.nextInt();
 		byte[] cipherText = encrypt("response "+port+" "+msg+" "+pubKey,serverKey);
         try {
@@ -216,10 +230,13 @@ public class RMIClient implements RMIClientIntf{
 
 	@Override
 	public void sendSymCipherText(byte[] ciphertext) throws RemoteException, InvalidKeyException, NoSuchAlgorithmException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException {
-		String msg = aesdecrypt(ciphertext,aesKey);
+		String[] msg = aesdecrypt(ciphertext,aesKey).split("\\s+");
 		
-		System.out.println("AES decrypt client: " + msg);
-		
+		switch(msg[0]){
+		case "help":
+			System.out.println("Help is incoming!");
+			break;
+		}
 	}
 }
 
