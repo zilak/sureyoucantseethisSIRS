@@ -28,6 +28,8 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.Scanner;
+import java.util.ArrayList;
 import java.util.Base64;
 
 import javax.crypto.BadPaddingException;
@@ -58,7 +60,8 @@ public class RMIServer
 	private static Map<Integer,Integer> challengeReceive = new HashMap<Integer,Integer>(); // os challenges received
 	private static Map<Integer,PublicKey> clientsPub = new HashMap<Integer,PublicKey>(); // Clients connected public
 	private static Map<Integer,SecretKey> clientsAES = new HashMap<Integer,SecretKey>(); // Sessions key with clients
-	private static Map<SecretKey,Integer> tokenAES = new HashMap <SecretKey,Integer>(); // Check if the message sent with that key is fresh(cant send duplicate token)
+	private static ArrayList<Integer> tokenAES = new ArrayList <Integer>(); // Check if the message sent with that key is fresh(cant send duplicate token)
+	private static Map<Integer,Integer> noCount = new HashMap<Integer,Integer>();
 	
     public RMIServer() throws RemoteException {
     	
@@ -271,10 +274,22 @@ public class RMIServer
 		System.out.println("Entrou no AESCipher Server e a chave AES e: "+secretKey);
 		String[] msg = aesdecrypt(ciphertext,secretKey).split("\\s+");
 		int portEnv = Integer.parseInt(msg[1]);
-		if(portEnv == port){
+		int token = Integer.parseInt(msg[2]);
+		Scanner s = new Scanner(System.in);
+		if(portEnv == port && tokenAES.contains(token)){
 			switch(msg[0]){
 			case "help":
-				System.out.println("Pedido de ajuda em: " + msg[2]);
+				System.out.println("Help request in: " + msg[3]);
+				System.out.println("Type [Y] for help type [N] for discard");
+				String resp = s.next().toUpperCase();
+				
+				while(!resp.equals("Y") || !resp.equals("N")){
+					System.out.println("Type [Y] for help type [N] for discard");
+					resp = s.next().toUpperCase();
+				}
+				if(resp.compareTo("Y")==0){
+					
+				}
 				break;
 			}
 		}

@@ -16,7 +16,9 @@ import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.InvalidKeySpecException;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Random;
 import java.util.Scanner;
 
 import javax.crypto.BadPaddingException;
@@ -30,13 +32,14 @@ import javax.xml.bind.DatatypeConverter;
 import com.sun.org.apache.xml.internal.security.exceptions.Base64DecodingException;
 
 public class RMIClient implements RMIClientIntf{ 
-	static RMIServerIntf objServer;
-	static PublicKey pubKey;
-	static PrivateKey privKey;
-	static PublicKey serverKey;
-	static SecretKey aesKey;
-	static int port;
+	private static RMIServerIntf objServer;
+	private static PublicKey pubKey;
+	private static PrivateKey privKey;
+	private static PublicKey serverKey;
+	private static SecretKey aesKey;
+	private static int port;
 	private static Scanner s = new Scanner(System.in);
+	private static ArrayList<Integer> tokens = new ArrayList<Integer>();
 	
     public static void main(String args[]) throws Exception {
     	
@@ -103,7 +106,12 @@ public class RMIClient implements RMIClientIntf{
 	    		System.out.println("Give your location: ");
 	    		String line = s.next();
 	    		System.out.println("localizacao: "+line);
-	    		byte[] cyphertext = aesencrypt("help "+port+" "+line,aesKey);
+	    		Random r = new Random();
+				int token = r.nextInt(999999 - 100000 +1)+100000;
+				while(tokens.contains(token)){
+					token = r.nextInt(999999 - 100000 +1)+100000;
+				}
+	    		byte[] cyphertext = aesencrypt("help "+port+" " + token+" "+line,aesKey);
 	    		objServer.sendAESCipherText(cyphertext,port);
 	    		break;
 	    	}
